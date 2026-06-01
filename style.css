@@ -87,7 +87,7 @@ html, body {
     position: relative;
 }
 
-.diff-card input[type="radio"] {
+.diff-card input[type="checkbox"] {
     position: absolute;
     opacity: 0;
     pointer-events: none;
@@ -112,7 +112,7 @@ html, body {
     background: rgba(255,255,255,0.06);
 }
 
-.diff-card input[type="radio"]:checked + .diff-label {
+.diff-card input[type="checkbox"]:checked + .diff-label {
     transform: scale(1.04);
 }
 
@@ -127,15 +127,15 @@ html, body {
 .diff-label[data-color="extreme"] { color: #ff1a1a; }
 .diff-label[data-color="list"] { color: #ffb347; }
 
-input[type="radio"]:checked + .diff-label[data-color="easy"] { border-color: #5cb85c; background: rgba(92,184,92,0.12); box-shadow: 0 0 14px rgba(92,184,92,0.2); }
-input[type="radio"]:checked + .diff-label[data-color="normal"] { border-color: #5bc0de; background: rgba(91,192,222,0.12); box-shadow: 0 0 14px rgba(91,192,222,0.2); }
-input[type="radio"]:checked + .diff-label[data-color="hard"] { border-color: #f0ad4e; background: rgba(240,173,78,0.12); box-shadow: 0 0 14px rgba(240,173,78,0.2); }
-input[type="radio"]:checked + .diff-label[data-color="harder"] { border-color: #e87b45; background: rgba(232,123,69,0.12); box-shadow: 0 0 14px rgba(232,123,69,0.2); }
-input[type="radio"]:checked + .diff-label[data-color="insane"] { border-color: #c764d0; background: rgba(199,100,208,0.12); box-shadow: 0 0 14px rgba(199,100,208,0.2); }
-input[type="radio"]:checked + .diff-label[data-color="demon"] { border-color: #ff6b6b; background: rgba(255,107,107,0.12); box-shadow: 0 0 14px rgba(255,107,107,0.2); }
-input[type="radio"]:checked + .diff-label[data-color="insane-demon"] { border-color: #ff3a3a; background: rgba(255,58,58,0.12); box-shadow: 0 0 14px rgba(255,58,58,0.2); }
-input[type="radio"]:checked + .diff-label[data-color="extreme"] { border-color: #ff1a1a; background: rgba(255,26,26,0.12); box-shadow: 0 0 14px rgba(255,26,26,0.2); }
-input[type="radio"]:checked + .diff-label[data-color="list"] { border-color: #ffb347; background: rgba(255,179,71,0.12); box-shadow: 0 0 14px rgba(255,179,71,0.2); }
+input[type="checkbox"]:checked + .diff-label[data-color="easy"] { border-color: #5cb85c; background: rgba(92,184,92,0.12); box-shadow: 0 0 14px rgba(92,184,92,0.2); }
+input[type="checkbox"]:checked + .diff-label[data-color="normal"] { border-color: #5bc0de; background: rgba(91,192,222,0.12); box-shadow: 0 0 14px rgba(91,192,222,0.2); }
+input[type="checkbox"]:checked + .diff-label[data-color="hard"] { border-color: #f0ad4e; background: rgba(240,173,78,0.12); box-shadow: 0 0 14px rgba(240,173,78,0.2); }
+input[type="checkbox"]:checked + .diff-label[data-color="harder"] { border-color: #e87b45; background: rgba(232,123,69,0.12); box-shadow: 0 0 14px rgba(232,123,69,0.2); }
+input[type="checkbox"]:checked + .diff-label[data-color="insane"] { border-color: #c764d0; background: rgba(199,100,208,0.12); box-shadow: 0 0 14px rgba(199,100,208,0.2); }
+input[type="checkbox"]:checked + .diff-label[data-color="demon"] { border-color: #ff6b6b; background: rgba(255,107,107,0.12); box-shadow: 0 0 14px rgba(255,107,107,0.2); }
+input[type="checkbox"]:checked + .diff-label[data-color="insane-demon"] { border-color: #ff3a3a; background: rgba(255,58,58,0.12); box-shadow: 0 0 14px rgba(255,58,58,0.2); }
+input[type="checkbox"]:checked + .diff-label[data-color="extreme"] { border-color: #ff1a1a; background: rgba(255,26,26,0.12); box-shadow: 0 0 14px rgba(255,26,26,0.2); }
+input[type="checkbox"]:checked + .diff-label[data-color="list"] { border-color: #ffb347; background: rgba(255,179,71,0.12); box-shadow: 0 0 14px rgba(255,179,71,0.2); }
 
 /* === Options row === */
 .options-row {
@@ -358,6 +358,21 @@ input[type="radio"]:checked + .diff-label[data-color="list"] { border-color: #ff
     letter-spacing: 1.5px;
     color: var(--muted);
     margin-bottom: 3px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.diff-badge {
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 20px;
+    background: rgba(78,142,247,0.15);
+    border: 1px solid rgba(78,142,247,0.3);
+    color: var(--accent);
+    letter-spacing: 0.5px;
+    text-transform: none;
 }
 
 .level-name {

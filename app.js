@@ -3,7 +3,7 @@ const GDB_SEARCH  = 'https://gdbrowser.com/api/search/';
 const PC_API      = 'https://pointercrate.com/api/v1/demons/?limit=100';
 const API_DELAY   = 2500;
 const LS_HISTORY  = 'gdr-history-v1';
-const LS_ACTIVE   = 'gdr-active-v2';
+const LS_ACTIVE   = 'gdr-active-v3';
 
 const DIFF_NAMES = {
     easy:        'Easy',
@@ -62,23 +62,25 @@ function shuffled(arr) {
 
 /* ── State ── */
 const S = {
-    mode:            null,
-    apiQuery:        '',
-    levelPool:       [],
+    mode:            null,    // 'gdb' | 'pointercrate'
+    selectedDiffs:   [],      // selected diff IDs
+    diffName:        '',      // display name for the run
+    // GDB multi-diff:
+    diffQueries:     {},      // { diffId: { query, pages } }
+    combinedPool:    [],      // [{ diffId, idx }, ...] shuffled
+    currentDiffId:   '',      // diffId of the level currently being played
+    // Pointercrate:
     pcPool:          [],
-    pages:           {},
-    diffId:          '',
-    diffName:        '',
-    diffMult:        1,
+    // Common:
     levelCount:      0,
     nextPct:         1,
     score:           0,
     startTime:       null,
     timerRef:        null,
     active:          false,
-    elapsedOffset:   0,    // seconds already elapsed before this session (for resume)
-    currentCardData: null, // {name, author, idOrNote} of the card being played
-    completedLevels: [],   // saved history of completed cards for resume
+    elapsedOffset:   0,
+    currentCardData: null,
+    completedLevels: [],
 };
 
 /* ── Init ── */
@@ -91,33 +93,52 @@ seedInput.addEventListener('change', () => {
     seedInput.value = rngSeed;
 });
 
-const radios = document.getElementsByName('difficulty');
-for (const r of radios) {
-    r.addEventListener('change', () => {
-        document.getElementById('start').disabled = false;
-    });
-}
-
-// URL params
+// URL params: pre-check difficulties
 const params = new URLSearchParams(window.location.search);
-for (const r of radios) {
-    if (params.has(r.id)) {
-        r.checked = true;
-        document.getElementById('start').disabled = false;
-    }
-}
+document.querySelectorAll('.diff-check').forEach(c => {
+    if (params.has(c.id)) { c.checked = true; }
+});
 if (params.has('seed')) {
     const s = parseInt(params.get('seed'));
     if (!isNaN(s)) { rngSeed = s; seedInput.value = s; document.getElementById('addSeed').checked = true; }
 }
-
+updateStartButton();
 refreshBestBadge();
 checkSavedGame();
 
+/* ── Difficulty checkbox logic ── */
+function onDiffChange(el) {
+    // Demonlist is mutually exclusive with everything else
+    if (el.id === 'demonlist' && el.checked) {
+        document.querySelectorAll('.diff-check:not(#demonlist)').forEach(c => { c.checked = false; });
+    } else if (el.checked) {
+        document.getElementById('demonlist').checked = false;
+    }
+    updateStartButton();
+}
+
+function updateStartButton() {
+    const any = [...document.querySelectorAll('.diff-check')].some(c => c.checked);
+    document.getElementById('start').disabled = !any;
+}
+
+function getSelectedDiffs() {
+    return [...document.querySelectorAll('.diff-check')]
+        .filter(c => c.checked)
+        .map(c => c.id);
+}
+
+function diffDisplayName(diffs) {
+    if (diffs.length === 1) return DIFF_NAMES[diffs[0]] || diffs[0];
+    const names = diffs.map(d => DIFF_NAMES[d] || d);
+    if (names.length <= 2) return names.join(' + ');
+    return names.slice(0, 2).join(' + ') + ` (+${names.length - 2} more)`;
+}
+
 /* ── Copy link ── */
 function copyLink() {
-    const adds = [];
-    for (const r of radios) { if (r.checked) { adds.push(r.id); break; } }
+    const diffs = getSelectedDiffs();
+    const adds  = diffs.length === 1 ? [diffs[0]] : [];
     if (document.getElementById('addSeed').checked) adds.push('seed=' + rngSeed);
     const url = location.href.split('?')[0] + (adds.length ? '?' + adds.join('&') : '');
     clipboardCopy(url);
@@ -158,47 +179,45 @@ function updateStats() {
 }
 
 /* ── Points ── */
-function calcPoints(required, got) {
-    const m         = S.diffMult;
+function calcPoints(required, got, diffId) {
+    const m         = DIFF_MULT[diffId] || 1;
     const base      = 5 * m;
     const overshoot = Math.max(0, got - required) * 2.5 * m;
     return base + overshoot;
 }
 
 /* ── GDB API ── */
-function delay() { return new Promise(r => setTimeout(r, API_DELAY)); }
+function shortDelay() { return new Promise(r => setTimeout(r, 500)); }
+function fullDelay()  { return new Promise(r => setTimeout(r, API_DELAY)); }
 
-async function fetchPage(page, iter = 0) {
+async function fetchPageFrom(diffData, page, iter = 0) {
     const key = 'p' + page;
-    if (S.pages[key]) return S.pages[key];
-    await delay();
-    const res = await axios.get(S.apiQuery + '&page=' + page);
+    if (diffData.pages[key]) return diffData.pages[key];
+    await fullDelay();
+    const res = await axios.get(diffData.query + '&page=' + page);
     if (res.data === -1 || res.data === '-1') {
-        if (iter < 5) return fetchPage(page, iter + 1);
+        if (iter < 5) return fetchPageFrom(diffData, page, iter + 1);
         showError('GDBrowser rate-limited. Wait a moment and refresh.');
         throw new Error('rate-limited');
     }
-    S.pages[key] = res.data;
+    diffData.pages[key] = res.data;
     return res.data;
 }
 
 /* ── Start roulette ── */
 async function startRoulette() {
-    let selected = null;
-    for (const r of radios) { if (r.checked) { selected = r; break; } }
-    if (!selected) { alert('Pick a difficulty first!'); return; }
+    const selectedDiffs = getSelectedDiffs();
+    if (!selectedDiffs.length) { alert('Pick at least one difficulty!'); return; }
 
-    // Custom start values
-    const useCustom = document.getElementById('custom-start-toggle').checked;
+    const useCustom   = document.getElementById('custom-start-toggle').checked;
     const customPct   = useCustom ? (parseInt(document.getElementById('custom-pct').value)   || 1) : 1;
     const customScore = useCustom ? (parseInt(document.getElementById('custom-score').value)  || 0) : 0;
 
-    S.diffId          = selected.id;
-    S.diffName        = DIFF_NAMES[S.diffId] || S.diffId;
-    S.diffMult        = DIFF_MULT[S.diffId]  || 1;
-    S.levelPool       = [];
+    S.selectedDiffs   = selectedDiffs;
+    S.diffName        = diffDisplayName(selectedDiffs);
+    S.diffQueries     = {};
+    S.combinedPool    = [];
     S.pcPool          = [];
-    S.pages           = {};
     S.levelCount      = 0;
     S.nextPct         = customPct;
     S.score           = customScore;
@@ -212,18 +231,45 @@ async function startRoulette() {
     startBtn.classList.add('is-loading');
 
     try {
-        if (S.diffId === 'demonlist') {
+        if (selectedDiffs.includes('demonlist')) {
             S.mode = 'pointercrate';
             const res = await axios.get(PC_API);
             S.pcPool = shuffled(res.data).slice(0, 100);
         } else {
             S.mode = 'gdb';
-            S.apiQuery = GDB_SEARCH + '*' + selected.value;
-            const page0 = await fetchPage(0);
-            const total = page0[0]?.results || 0;
-            if (!total) { showError('No levels found for that difficulty.'); startBtn.classList.remove('is-loading'); return; }
-            for (let i = 1; i <= total; i++) S.levelPool.push(i);
-            S.levelPool = shuffled(S.levelPool).slice(0, 100);
+            // How many levels to pull per difficulty (totals ~100)
+            const perDiff = Math.max(10, Math.round(100 / selectedDiffs.length));
+
+            for (let i = 0; i < selectedDiffs.length; i++) {
+                const diffId = selectedDiffs[i];
+                const query  = GDB_SEARCH + '*' + document.getElementById(diffId).value;
+                if (i > 0) await shortDelay();
+
+                let total = 0;
+                try {
+                    const res = await axios.get(query + '&page=0');
+                    total = (res.data !== -1 && res.data !== '-1') ? (res.data[0]?.results || 0) : 0;
+                } catch {}
+
+                if (!total) continue;
+
+                const pool = [];
+                for (let j = 1; j <= total; j++) pool.push(j);
+                const trimmed = shuffled(pool).slice(0, perDiff);
+
+                S.diffQueries[diffId] = { query, pages: {} };
+                for (const idx of trimmed) {
+                    S.combinedPool.push({ diffId, idx });
+                }
+            }
+
+            S.combinedPool = shuffled(S.combinedPool);
+
+            if (!S.combinedPool.length) {
+                showError('No levels found for the selected difficulties.');
+                startBtn.classList.remove('is-loading');
+                return;
+            }
         }
     } catch (e) {
         startBtn.classList.remove('is-loading');
@@ -252,58 +298,67 @@ function showGameUI() {
 }
 
 /* ── New game / Play again ── */
-function newGame() {
+function newGame()        { clearActiveGame(); location.reload(); }
+function playAgainSame()  {
     clearActiveGame();
-    location.reload();
-}
-
-function playAgainSame() {
-    clearActiveGame();
-    location.href = location.href.split('?')[0] + '?' + S.diffId;
+    // Re-check same difficulties via URL params (single diff only)
+    if (S.selectedDiffs.length === 1) {
+        location.href = location.href.split('?')[0] + '?' + S.selectedDiffs[0];
+    } else {
+        location.reload();
+    }
 }
 
 /* ── GDB: next level ── */
 async function getNextGDB() {
-    if (S.levelPool.length === 0) { endRun(false); return; }
-    const idx  = S.levelPool.shift();
+    if (!S.combinedPool.length) { endRun(false); return; }
+    const { diffId, idx } = S.combinedPool.shift();
+    S.currentDiffId = diffId;
+
+    const diffData = S.diffQueries[diffId];
     const page = Math.floor((idx - 1) / 10);
     const pos  = (idx - 1) % 10;
 
     let level;
     try {
-        const data = await fetchPage(page);
+        const data = await fetchPageFrom(diffData, page);
         level = data[pos];
     } catch { return; }
 
     if (!level) { getNextGDB(); return; }
-    appendCard(level.name, level.author, String(level.id), 'completeGDB');
+    appendCard(level.name, level.author, String(level.id), diffId, 'completeGDB');
 }
 
 /* ── Pointercrate: next level ── */
 function getNextPC() {
-    if (S.pcPool.length === 0) { endRun(false); return; }
+    if (!S.pcPool.length) { endRun(false); return; }
     const lvl = S.pcPool.shift();
     if (!lvl) { getNextPC(); return; }
+    S.currentDiffId = 'demonlist';
     const author = lvl.publisher?.name || 'Unknown';
     const note   = lvl.verifier?.name ? `Verified by ${lvl.verifier.name}` : '';
-    appendCard(lvl.name, author, note, 'completePC');
+    appendCard(lvl.name, author, note, 'demonlist', 'completePC');
 }
 
-/* ── Append card ── */
-function appendCard(name, author, idOrNote, completeFunc) {
+/* ── Append active card ── */
+function appendCard(name, author, idOrNote, diffId, completeFunc) {
     S.levelCount++;
-    S.currentCardData = { name, author, idOrNote };
+    S.currentCardData = { name, author, idOrNote, diffId };
 
-    const card = document.createElement('div');
-    card.className = 'level-card animate__animated animate__fadeInUpBig';
+    const showBadge = S.selectedDiffs.length > 1 || S.mode === 'pointercrate';
+    const badge     = showBadge
+        ? `<span class="diff-badge">${esc(DIFF_NAMES[diffId] || diffId)}</span>`
+        : '';
 
     const subLine = idOrNote
         ? `By ${esc(author)} · <span style="opacity:.5">${esc(idOrNote)}</span>`
         : `By ${esc(author)}`;
 
+    const card = document.createElement('div');
+    card.className = 'level-card animate__animated animate__fadeInUpBig';
     card.innerHTML = `
         <div class="level-meta">
-            <div class="level-num">Level #${S.levelCount}</div>
+            <div class="level-num">Level #${S.levelCount} ${badge}</div>
             <div class="level-name">${esc(name)}</div>
             <div class="level-sub">${subLine}</div>
         </div>
@@ -324,10 +379,12 @@ function appendCard(name, author, idOrNote, completeFunc) {
     document.getElementById('pct-input').focus();
 }
 
-/* ── Append a read-only (already completed) card — used when resuming ── */
+/* ── Append read-only card (for resume) ── */
 function appendLockedCard(level) {
-    const card = document.createElement('div');
-    card.className = 'level-card is-done';
+    const showBadge = S.selectedDiffs.length > 1 || S.mode === 'pointercrate';
+    const badge     = showBadge
+        ? `<span class="diff-badge">${esc(DIFF_NAMES[level.diffId] || level.diffId)}</span>`
+        : '';
 
     const subLine = level.idOrNote
         ? `By ${esc(level.author)} · <span style="opacity:.5">${esc(level.idOrNote)}</span>`
@@ -336,9 +393,11 @@ function appendLockedCard(level) {
     const overshootLine = level.wasOvershoot
         ? `<div class="done-overshoot">Overshoot (half pts on extra %)</div>` : '';
 
+    const card = document.createElement('div');
+    card.className = 'level-card is-done';
     card.innerHTML = `
         <div class="level-meta">
-            <div class="level-num">Level #${card._num}</div>
+            <div class="level-num">Level #${level.num} ${badge}</div>
             <div class="level-name">${esc(level.name)}</div>
             <div class="level-sub">${subLine}</div>
         </div>
@@ -348,10 +407,7 @@ function appendLockedCard(level) {
             ${overshootLine}
         </div>
     `;
-
     document.getElementById('levels').appendChild(card);
-    // fix level number after appending
-    card.querySelector('.level-num').textContent = `Level #${level.num}`;
 }
 
 /* ── Complete handlers ── */
@@ -370,31 +426,32 @@ function handleComplete(next) {
     }
 
     const required = S.nextPct;
-    const pts = calcPoints(required, pct);
-    S.score += pts;
+    const pts      = calcPoints(required, pct, S.currentDiffId);
+    S.score       += pts;
 
     lockAction(pct, pts, pct > required);
-
     S.nextPct = pct + 1;
     updateStats();
     saveActiveGame();
 
     if (pct >= 100) { endRun(false); return; }
-    const poolEmpty = S.mode === 'gdb' ? S.levelPool.length === 0 : S.pcPool.length === 0;
-    if (poolEmpty) { endRun(false); return; }
+    const poolEmpty = S.mode === 'gdb' ? S.combinedPool.length === 0 : S.pcPool.length === 0;
+    if (poolEmpty)  { endRun(false); return; }
 
     next();
 }
 
-/* ── Lock completed action div ── */
 function lockAction(pct, pts, wasOvershoot) {
     const el = document.getElementById('current-action');
     if (!el) return;
     el.removeAttribute('id');
 
-    // Record for resume
     if (S.currentCardData) {
-        S.completedLevels.push({ ...S.currentCardData, num: S.levelCount, pct, pts, wasOvershoot });
+        S.completedLevels.push({
+            ...S.currentCardData,
+            num: S.levelCount,
+            pct, pts, wasOvershoot,
+        });
     }
 
     const overshootLine = wasOvershoot
@@ -409,7 +466,6 @@ function lockAction(pct, pts, wasOvershoot) {
     el.closest('.level-card')?.classList.add('is-done');
 }
 
-/* ── Give up ── */
 function giveUp() { endRun(true); }
 
 /* ── End run ── */
@@ -440,7 +496,7 @@ function endRun(givenUp) {
     el.className = 'results-card animate__animated animate__fadeInUpBig';
     el.innerHTML = `
         <div class="results-title">${complete ? 'Roulette Complete!' : givenUp ? 'Given Up' : 'Run Over'}</div>
-        <div class="results-diff">${S.diffName}</div>
+        <div class="results-diff">${esc(S.diffName)}</div>
         <div class="results-grid">
             <div class="results-stat">
                 <div class="results-stat-value">${score.toLocaleString()}</div>
@@ -476,24 +532,25 @@ function endRun(givenUp) {
 function saveActiveGame() {
     if (!S.active) return;
     try {
-        const save = {
-            v: 2,
-            ts: Date.now(),
+        localStorage.setItem(LS_ACTIVE, JSON.stringify({
+            v: 3,
+            ts:              Date.now(),
             mode:            S.mode,
-            diffId:          S.diffId,
+            selectedDiffs:   S.selectedDiffs,
             diffName:        S.diffName,
-            diffMult:        S.diffMult,
-            rngSeed,
-            apiQuery:        S.apiQuery,
+            currentDiffId:   S.currentDiffId,
+            diffQueries:     Object.fromEntries(
+                Object.entries(S.diffQueries).map(([id, d]) => [id, { query: d.query }])
+            ),
+            combinedPool:    S.combinedPool,
+            pcPool:          S.pcPool,
             nextPct:         S.nextPct,
             score:           S.score,
             levelCount:      S.levelCount,
             elapsedSecs:     elapsedSecs(),
-            levelPool:       S.levelPool,
-            pcPool:          S.pcPool,
             completedLevels: S.completedLevels,
-        };
-        localStorage.setItem(LS_ACTIVE, JSON.stringify(save));
+            rngSeed,
+        }));
     } catch {}
 }
 
@@ -503,10 +560,8 @@ function clearActiveGame() {
 
 function checkSavedGame() {
     try {
-        const raw = localStorage.getItem(LS_ACTIVE);
-        if (!raw) return;
-        const save = JSON.parse(raw);
-        if (!save || save.v !== 2) { clearActiveGame(); return; }
+        const save = JSON.parse(localStorage.getItem(LS_ACTIVE));
+        if (!save || save.v !== 3) { clearActiveGame(); return; }
 
         const banner = document.getElementById('resume-banner');
         document.getElementById('resume-diff').textContent   = save.diffName;
@@ -521,27 +576,27 @@ function resumeGame() {
         const save = JSON.parse(localStorage.getItem(LS_ACTIVE));
         if (!save) return;
 
-        // Restore state
         S.mode            = save.mode;
-        S.diffId          = save.diffId;
-        S.diffName        = save.diffName;
-        S.diffMult        = save.diffMult;
-        S.apiQuery        = save.apiQuery;
+        S.selectedDiffs   = save.selectedDiffs   || [];
+        S.diffName        = save.diffName        || '';
+        S.currentDiffId   = save.currentDiffId   || '';
+        S.combinedPool    = save.combinedPool    || [];
+        S.pcPool          = save.pcPool          || [];
         S.nextPct         = save.nextPct;
         S.score           = save.score;
         S.levelCount      = save.levelCount;
-        S.levelPool       = save.levelPool || [];
-        S.pcPool          = save.pcPool    || [];
-        S.pages           = {};
+        S.elapsedOffset   = save.elapsedSecs     || 0;
         S.completedLevels = save.completedLevels || [];
-        S.elapsedOffset   = save.elapsedSecs || 0;
         S.active          = true;
         rngSeed           = save.rngSeed;
 
-        // Re-render completed level cards
-        for (const level of S.completedLevels) {
-            appendLockedCard(level);
+        // Rebuild diffQueries with empty page caches
+        S.diffQueries = {};
+        for (const [id, d] of Object.entries(save.diffQueries || {})) {
+            S.diffQueries[id] = { query: d.query, pages: {} };
         }
+
+        for (const level of S.completedLevels) appendLockedCard(level);
 
         hideSettings();
         showGameUI();
@@ -549,7 +604,7 @@ function resumeGame() {
         if (S.mode === 'gdb') getNextGDB();
         else getNextPC();
 
-    } catch (e) {
+    } catch {
         clearActiveGame();
         showError('Could not resume saved game. Starting fresh.');
     }
@@ -592,38 +647,33 @@ function showHistory() {
     } else {
         const best  = Math.max(...hist.map(r => r.score));
         const total = hist.length;
-        const entries = hist.map(run => {
-            const d    = new Date(run.date).toLocaleDateString();
-            const mins = Math.floor(run.elapsed / 60);
-            const secs = run.elapsed % 60;
-            return `<div class="history-entry">
-                <div>
-                    <span class="history-diff">${run.diff}</span>
-                    <span class="history-date" style="margin-left:8px">${d}</span>
-                </div>
-                <div>
-                    <div class="history-score">${run.score.toLocaleString()} pts</div>
-                    <div class="history-sub">${run.levels} lvls · ${run.highestPct}% · ${mins}m${String(secs).padStart(2,'0')}s</div>
-                </div>
-            </div>`;
-        }).join('');
-
         body.innerHTML = `
             <div class="history-summary">
                 Best: <strong>${best.toLocaleString()} pts</strong> &nbsp;·&nbsp; ${total} run${total !== 1 ? 's' : ''}
             </div>
-            ${entries}
+            ${hist.map(run => {
+                const d    = new Date(run.date).toLocaleDateString();
+                const mins = Math.floor(run.elapsed / 60);
+                const secs = run.elapsed % 60;
+                return `<div class="history-entry">
+                    <div>
+                        <span class="history-diff">${esc(run.diff)}</span>
+                        <span class="history-date" style="margin-left:8px">${d}</span>
+                    </div>
+                    <div>
+                        <div class="history-score">${run.score.toLocaleString()} pts</div>
+                        <div class="history-sub">${run.levels} lvls · ${run.highestPct}% · ${mins}m${String(secs).padStart(2,'0')}s</div>
+                    </div>
+                </div>`;
+            }).join('')}
         `;
     }
 
     document.getElementById('history-modal').classList.add('is-active');
 }
 
-function closeHistory() {
-    document.getElementById('history-modal').classList.remove('is-active');
-}
-
-function clearHistory() {
+function closeHistory()  { document.getElementById('history-modal').classList.remove('is-active'); }
+function clearHistory()  {
     if (!confirm('Clear all run history?')) return;
     localStorage.removeItem(LS_HISTORY);
     closeHistory();
