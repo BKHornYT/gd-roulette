@@ -21,17 +21,17 @@ const DIFF_NAMES = {
 };
 
 const DIFF_MULT = {
-    easy:        1,
-    normal:      1.5,
-    hard:        2,
-    harder:      3,
-    insane:      5,
-    easydemon:   8,
-    mediumdemon: 13,
-    harddemon:   20,
-    insanedemon: 35,
-    anydemon:    10,
-    extremedemon:50,
+    easy:        0,   // no points
+    normal:      0,
+    hard:        0,
+    harder:      0,
+    insane:      1,   // minimum
+    easydemon:   4,
+    mediumdemon: 8,
+    harddemon:   15,
+    insanedemon: 25,
+    anydemon:    6,
+    extremedemon:40,
     demonlist:   60,
 };
 
@@ -158,18 +158,12 @@ function toggleCustomStart() {
     document.getElementById('custom-start-fields').classList.toggle('is-hidden', !on);
 }
 
-/* ── Timer ── */
+/* ── Timer (internal only — not shown live) ── */
 function startTimer() {
     S.startTime = Date.now();
-    S.timerRef = setInterval(() => {
-        const s = elapsedSecs();
-        document.getElementById('live-timer').textContent =
-            Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
-    }, 1000);
 }
 
 function stopTimer() {
-    clearInterval(S.timerRef);
     return elapsedSecs();
 }
 
@@ -399,6 +393,8 @@ function appendLockedCard(level) {
 
     const overshootLine = level.wasOvershoot
         ? `<div class="done-overshoot">Overshoot (half pts on extra %)</div>` : '';
+    const ptsLine = level.pts > 0
+        ? `<div class="done-points">+${Math.round(level.pts)} pts</div>` : '';
 
     const card = document.createElement('div');
     card.className = 'level-card is-done';
@@ -410,7 +406,7 @@ function appendLockedCard(level) {
         </div>
         <div class="level-done">
             <div class="done-percent">${level.pct}%</div>
-            <div class="done-points">+${Math.round(level.pts)} pts</div>
+            ${ptsLine}
             ${overshootLine}
         </div>
     `;
@@ -463,10 +459,12 @@ function lockAction(pct, pts, wasOvershoot) {
 
     const overshootLine = wasOvershoot
         ? `<div class="done-overshoot">Overshoot (half pts on extra %)</div>` : '';
+    const ptsLine = pts > 0
+        ? `<div class="done-points">+${Math.round(pts)} pts</div>` : '';
     el.innerHTML = `
         <div class="level-done">
             <div class="done-percent">${pct}%</div>
-            <div class="done-points">+${Math.round(pts)} pts</div>
+            ${ptsLine}
             ${overshootLine}
         </div>
     `;
