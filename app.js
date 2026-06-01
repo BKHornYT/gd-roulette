@@ -1,6 +1,7 @@
 /* ── Constants ── */
 const GDB_SEARCH  = 'https://gdbrowser.com/api/search/';
-const PC_API      = 'https://pointercrate.com/api/v1/demons/?limit=100';
+const PC_API_V2   = 'https://pointercrate.com/api/v2/demons/listed?limit=75';
+const PC_API_V1   = 'https://pointercrate.com/api/v1/demons/?limit=75';
 const API_DELAY   = 2500;
 const LS_HISTORY  = 'gdr-history-v1';
 const LS_ACTIVE   = 'gdr-active-v3';
@@ -25,14 +26,14 @@ const DIFF_MULT = {
     normal:      0,
     hard:        0,
     harder:      0,
-    insane:      1,   // minimum
-    easydemon:   4,
-    mediumdemon: 8,
-    harddemon:   15,
-    insanedemon: 25,
-    anydemon:    6,
-    extremedemon:40,
-    demonlist:   60,
+    insane:      0,   // no points
+    easydemon:   1,   // lowest that gives points
+    mediumdemon: 3,
+    harddemon:   6,
+    insanedemon: 15,
+    anydemon:    2,
+    extremedemon:25,
+    demonlist:   35,
 };
 
 const SPLASH = [
@@ -232,8 +233,22 @@ async function startRoulette() {
     try {
         if (selectedDiffs.includes('demonlist')) {
             S.mode = 'pointercrate';
-            const res = await axios.get(PC_API);
-            S.pcPool = shuffled(res.data).slice(0, 100);
+            let demons = null;
+            try {
+                const res = await axios.get(PC_API_V2);
+                demons = Array.isArray(res.data) ? res.data : null;
+            } catch {}
+            if (!demons) {
+                const res = await axios.get(PC_API_V1);
+                demons = Array.isArray(res.data) ? res.data : [];
+            }
+            if (!demons.length) {
+                showError('Could not load the Extreme Demon List. Pointercrate may be down.');
+                startBtn.classList.remove('is-loading');
+                S.active = false;
+                return;
+            }
+            S.pcPool = shuffled(demons).slice(0, 75);
         } else {
             S.mode = 'gdb';
             // How many levels to pull per difficulty (totals ~100)
