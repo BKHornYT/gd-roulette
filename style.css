@@ -582,6 +582,68 @@ input[type="radio"]:checked + .diff-label[data-color="list"] { border-color: #ff
     padding: 30px 0;
 }
 
+/* === Resume banner === */
+.resume-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    background: rgba(46,204,113,0.08);
+    border: 1px solid rgba(46,204,113,0.35);
+    border-radius: 12px;
+    padding: 16px 22px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.resume-info { flex: 1; }
+
+.resume-title {
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--green);
+    margin-bottom: 4px;
+}
+
+.resume-meta {
+    font-size: 0.88rem;
+    color: var(--text);
+}
+
+.resume-btns {
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+/* === Custom start section === */
+.custom-start-row {
+    border-top: 1px solid var(--border);
+    padding-top: 18px;
+    margin-top: 18px;
+}
+
+.custom-start-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-top: 14px;
+    padding: 16px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+/* === Results buttons === */
+.results-btns {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
 /* === Footer nav === */
 .footer-nav {
     text-align: center;

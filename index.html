@@ -21,6 +21,21 @@
             <div class="best-score-badge" id="best-badge"></div>
         </section>
 
+        <!-- Resume banner (shown when a saved game is found) -->
+        <div class="resume-banner is-hidden" id="resume-banner">
+            <div class="resume-info">
+                <div class="resume-title">Unfinished run found</div>
+                <div class="resume-meta">
+                    <strong id="resume-diff"></strong> &nbsp;·&nbsp;
+                    <span id="resume-detail"></span>
+                </div>
+            </div>
+            <div class="resume-btns">
+                <button class="gd-btn" onclick="resumeGame()">Resume</button>
+                <button class="gd-btn-danger" onclick="discardGame()">Discard</button>
+            </div>
+        </div>
+
         <!-- Settings panel -->
         <div class="gd-box animate__animated" id="settings">
             <h2 class="section-label">Select Difficulty</h2>
@@ -90,6 +105,26 @@
                     <button class="gd-btn-outline" onclick="copyLink()">
                         <span id="copy-link-text">Copy Link</span>
                     </button>
+                </div>
+            </div>
+
+            <!-- Custom start (for continuing a run manually) -->
+            <div class="custom-start-row">
+                <label class="gd-checkbox">
+                    <input type="checkbox" id="custom-start-toggle" onchange="toggleCustomStart()">
+                    Continue from a specific point
+                </label>
+                <div id="custom-start-fields" class="is-hidden custom-start-fields">
+                    <div class="option-group">
+                        <label class="option-label">Starting %</label>
+                        <input class="gd-input" type="number" id="custom-pct"
+                            value="1" min="1" max="99" placeholder="1" style="width:90px">
+                    </div>
+                    <div class="option-group">
+                        <label class="option-label">Starting score</label>
+                        <input class="gd-input" type="number" id="custom-score"
+                            value="0" min="0" placeholder="0" style="width:120px">
+                    </div>
                 </div>
             </div>
 
