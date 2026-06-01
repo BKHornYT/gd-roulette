@@ -693,6 +693,12 @@ function showError(msg) {
     document.getElementById('error-modal').classList.add('is-active');
 }
 
+function closeErrorAndRetry() {
+    document.getElementById('error-modal').classList.remove('is-active');
+    // Only retry if a game isn't already running
+    if (!S.active) startRoulette();
+}
+
 /* ── Helpers ── */
 function esc(str) {
     return String(str)
@@ -708,11 +714,3 @@ function clipboardCopy(text) {
     } catch {}
 }
 
-/* ── GDB status check (silent — shows warning only if levels fail to load) ── */
-setTimeout(async () => {
-    try {
-        const res = await axios.get(GDB_SEARCH + '*');
-        if (res.data === -1 || res.data === '-1')
-            console.warn('GDBrowser may be down or rate-limiting.');
-    } catch {}
-}, 0);
