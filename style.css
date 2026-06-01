@@ -90,7 +90,8 @@ html, body {
 .diff-card input[type="checkbox"] {
     position: absolute;
     opacity: 0;
-    pointer-events: none;
+    width: 1px;
+    height: 1px;
 }
 
 .diff-label {

@@ -93,6 +93,11 @@ seedInput.addEventListener('change', () => {
     seedInput.value = rngSeed;
 });
 
+// Attach change listeners to all difficulty checkboxes
+document.querySelectorAll('.diff-check').forEach(c => {
+    c.addEventListener('change', () => onDiffChange(c));
+});
+
 // URL params: pre-check difficulties
 const params = new URLSearchParams(window.location.search);
 document.querySelectorAll('.diff-check').forEach(c => {
@@ -243,21 +248,22 @@ async function startRoulette() {
             for (let i = 0; i < selectedDiffs.length; i++) {
                 const diffId = selectedDiffs[i];
                 const query  = GDB_SEARCH + '*' + document.getElementById(diffId).value;
-                if (i > 0) await shortDelay();
 
-                let total = 0;
-                try {
-                    const res = await axios.get(query + '&page=0');
-                    total = (res.data !== -1 && res.data !== '-1') ? (res.data[0]?.results || 0) : 0;
-                } catch {}
+                // Init entry so fetchPageFrom can cache into it
+                S.diffQueries[diffId] = { query, pages: {} };
 
+                // Use fetchPageFrom so we get the proper 2.5s delay + retry logic
+                let pageData;
+                try { pageData = await fetchPageFrom(S.diffQueries[diffId], 0); }
+                catch { continue; }
+
+                const total = pageData?.[0]?.results || 0;
                 if (!total) continue;
 
                 const pool = [];
                 for (let j = 1; j <= total; j++) pool.push(j);
                 const trimmed = shuffled(pool).slice(0, perDiff);
 
-                S.diffQueries[diffId] = { query, pages: {} };
                 for (const idx of trimmed) {
                     S.combinedPool.push({ diffId, idx });
                 }
@@ -272,6 +278,7 @@ async function startRoulette() {
             }
         }
     } catch (e) {
+        S.active = false;
         startBtn.classList.remove('is-loading');
         if (e.message !== 'rate-limited') showError('Failed to load levels. Check your connection.');
         return;
@@ -701,11 +708,11 @@ function clipboardCopy(text) {
     } catch {}
 }
 
-/* ── GDB status check ── */
+/* ── GDB status check (silent — shows warning only if levels fail to load) ── */
 setTimeout(async () => {
     try {
         const res = await axios.get(GDB_SEARCH + '*');
         if (res.data === -1 || res.data === '-1')
-            showError('GDBrowser appears to be down right now. Levels may not load.');
+            console.warn('GDBrowser may be down or rate-limiting.');
     } catch {}
 }, 0);
