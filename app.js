@@ -255,8 +255,11 @@ async function startRoulette() {
                 const diffId = selectedDiffs[i];
                 const query  = GDB_SEARCH + '*' + document.getElementById(diffId).value;
 
+                const noPlatformer = document.getElementById('no-platformer').checked;
+                const fullQuery = noPlatformer ? query + '&platformer=0' : query;
+
                 // Init entry so fetchPageFrom can cache into it
-                S.diffQueries[diffId] = { query, pages: {} };
+                S.diffQueries[diffId] = { query: fullQuery, pages: {} };
 
                 // Use fetchPageFrom so we get the proper 2.5s delay + retry logic
                 let pageData;
