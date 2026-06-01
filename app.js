@@ -348,30 +348,43 @@ function getNextPC() {
     const lvl = S.pcPool.shift();
     if (!lvl) { getNextPC(); return; }
     S.currentDiffId = 'demonlist';
-    const author  = lvl.publisher?.name || 'Unknown';
-    const idOrNote = lvl.level_id ? String(lvl.level_id) : (lvl.verifier?.name ? `Verified by ${lvl.verifier.name}` : '');
-    appendCard(lvl.name, author, idOrNote, 'demonlist', 'completePC');
+    const author   = lvl.publisher?.name || 'Unknown';
+    const idOrNote = lvl.level_id ? String(lvl.level_id) : '';
+    appendCard(lvl.name, author, idOrNote, 'demonlist', 'completePC', {
+        position:  lvl.position,
+        thumbnail: lvl.thumbnail,
+    });
 }
 
 /* ── Append active card ── */
-function appendCard(name, author, idOrNote, diffId, completeFunc) {
+function appendCard(name, author, idOrNote, diffId, completeFunc, extra = {}) {
     S.levelCount++;
-    S.currentCardData = { name, author, idOrNote, diffId };
+    const { position, thumbnail } = extra;
+    S.currentCardData = { name, author, idOrNote, diffId, position, thumbnail };
 
     const showBadge = S.selectedDiffs.length > 1 || S.mode === 'pointercrate';
     const badge     = showBadge
         ? `<span class="diff-badge">${esc(DIFF_NAMES[diffId] || diffId)}</span>`
         : '';
 
+    const posTag = position
+        ? `<span class="list-pos">#${position} on List</span>`
+        : '';
+
     const subLine = idOrNote
         ? `By ${esc(author)} · <span style="opacity:.5">${esc(idOrNote)}</span>`
         : `By ${esc(author)}`;
 
+    const thumbHtml = thumbnail
+        ? `<img src="${esc(thumbnail)}" class="level-thumb" alt="" loading="lazy">`
+        : '';
+
     const card = document.createElement('div');
     card.className = 'level-card animate__animated animate__fadeInUpBig';
     card.innerHTML = `
+        ${thumbHtml}
         <div class="level-meta">
-            <div class="level-num">Level #${S.levelCount} ${badge}</div>
+            <div class="level-num">Level #${S.levelCount} ${badge} ${posTag}</div>
             <div class="level-name">${esc(name)}</div>
             <div class="level-sub">${subLine}</div>
         </div>
@@ -399,9 +412,17 @@ function appendLockedCard(level) {
         ? `<span class="diff-badge">${esc(DIFF_NAMES[level.diffId] || level.diffId)}</span>`
         : '';
 
+    const posTag = level.position
+        ? `<span class="list-pos">#${level.position} on List</span>`
+        : '';
+
     const subLine = level.idOrNote
         ? `By ${esc(level.author)} · <span style="opacity:.5">${esc(level.idOrNote)}</span>`
         : `By ${esc(level.author)}`;
+
+    const thumbHtml = level.thumbnail
+        ? `<img src="${esc(level.thumbnail)}" class="level-thumb" alt="" loading="lazy">`
+        : '';
 
     const overshootLine = level.wasOvershoot
         ? `<div class="done-overshoot">Overshoot (half pts on extra %)</div>` : '';
@@ -411,8 +432,9 @@ function appendLockedCard(level) {
     const card = document.createElement('div');
     card.className = 'level-card is-done';
     card.innerHTML = `
+        ${thumbHtml}
         <div class="level-meta">
-            <div class="level-num">Level #${level.num} ${badge}</div>
+            <div class="level-num">Level #${level.num} ${badge} ${posTag}</div>
             <div class="level-name">${esc(level.name)}</div>
             <div class="level-sub">${subLine}</div>
         </div>
