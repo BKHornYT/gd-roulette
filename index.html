@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GD Roulette</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container" id="app">
+
+        <!-- Header -->
+        <section class="hero has-text-centered py-5">
+            <h1 class="gd-title">Geometry Dash Roulette</h1>
+            <p class="splash-text" id="splash"></p>
+            <div class="best-score-badge" id="best-badge"></div>
+        </section>
+
+        <!-- Settings panel -->
+        <div class="gd-box animate__animated" id="settings">
+            <h2 class="section-label">Select Difficulty</h2>
+
+            <div class="diff-grid">
+                <label class="diff-card">
+                    <input type="radio" name="difficulty" id="easy" value="?diff=1&type=4">
+                    <span class="diff-label" data-color="easy">Easy</span>
+                </label>
+                <label class="diff-card">
+                    <input type="radio" name="difficulty" id="normal" value="?diff=2&type=4">
+                    <span class="diff-label" data-color="normal">Normal</span>
+                </label>
+                <label class="diff-card">
+                    <input type="radio" name="difficulty" id="hard" value="?diff=3&type=4">
+                    <span class="diff-label" data-color="hard">Hard</span>
+                </label>
+                <label class="diff-card">
+                    <input type="radio" name="difficulty" id="harder" value="?diff=4&type=4">
+                    <span class="diff-label" data-color="harder">Harder</span>
+                </label>
+                <label class="diff-card">
+                    <input type="radio" name="difficulty" id="insane" value="?diff=5&type=4">
+                    <span class="diff-label" data-color="insane">Insane</span>
+                </label>
+                <label class="diff-card">
+                    <input type="radio" name="difficulty" id="easydemon" value="?diff=-1&demonFilter=1&type=4">
+                    <span class="diff-label" data-color="demon">Easy Demon</span>
+                </label>
+                <label class="diff-card">
+                    <input type="radio" name="difficulty" id="mediumdemon" value="?diff=-1&demonFilter=2&type=4">
+                    <span class="diff-label" data-color="demon">Medium Demon</span>
+                </label>
+                <label class="diff-card">
+                    <input type="radio" name="difficulty" id="harddemon" value="?diff=-1&demonFilter=3&type=4">
+                    <span class="diff-label" data-color="demon">Hard Demon</span>
+                </label>
+                <label class="diff-card">
+                    <input type="radio" name="difficulty" id="insanedemon" value="?diff=-1&demonFilter=4&type=4">
+                    <span class="diff-label" data-color="insane-demon">Insane Demon</span>
+                </label>
+                <label class="diff-card">
+                    <input type="radio" name="difficulty" id="anydemon" value="?diff=-1&type=4">
+                    <span class="diff-label" data-color="demon">Any Demon</span>
+                </label>
+                <label class="diff-card">
+                    <input type="radio" name="difficulty" id="extremedemon" value="?diff=-1&demonFilter=5&type=4">
+                    <span class="diff-label" data-color="extreme">Extreme Demon</span>
+                </label>
+                <label class="diff-card">
+                    <input type="radio" name="difficulty" id="demonlist" value="demonlist">
+                    <span class="diff-label" data-color="list">Extreme Demon List</span>
+                </label>
+            </div>
+
+            <div class="options-row">
+                <div class="option-group">
+                    <label class="option-label">Seed</label>
+                    <input class="gd-input" type="number" id="seed" placeholder="Random">
+                </div>
+                <div class="option-group">
+                    <label class="gd-checkbox">
+                        <input type="checkbox" id="addSeed"> Embed seed in link
+                    </label>
+                </div>
+                <div class="option-group">
+                    <button class="gd-btn-outline" onclick="copyLink()">
+                        <span id="copy-link-text">Copy Link</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="has-text-centered mt-5">
+                <button class="gd-btn gd-btn-large" id="start" disabled onclick="startRoulette()">
+                    Start Roulette
+                </button>
+            </div>
+        </div>
+
+        <!-- Live stats bar (shown during run) -->
+        <div class="stats-bar is-hidden" id="stats-bar">
+            <div class="stat-item">
+                <div class="stat-value" id="live-score">0</div>
+                <div class="stat-label">Score</div>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <div class="stat-value" id="live-levels">0</div>
+                <div class="stat-label">Levels</div>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <div class="stat-value" id="live-target">1%</div>
+                <div class="stat-label">Target</div>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+                <div class="stat-value" id="live-timer">0:00</div>
+                <div class="stat-label">Time</div>
+            </div>
+        </div>
+
+        <!-- Levels -->
+        <div id="levels"></div>
+
+        <!-- Footer nav -->
+        <div class="footer-nav">
+            <button class="gd-btn-outline" onclick="showHistory()">Run History</button>
+        </div>
+    </div>
+
+    <!-- History modal -->
+    <div class="modal" id="history-modal">
+        <div class="modal-background" onclick="closeHistory()"></div>
+        <div class="modal-card gd-modal">
+            <header class="modal-card-head">
+                <p class="modal-card-title">Run History</p>
+                <button class="delete" aria-label="close" onclick="closeHistory()"></button>
+            </header>
+            <section class="modal-card-body" id="history-body"></section>
+            <footer class="modal-card-foot">
+                <button class="button is-danger is-light" onclick="clearHistory()">Clear All</button>
+                <button class="button" onclick="closeHistory()">Close</button>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Error modal -->
+    <div class="modal" id="error-modal">
+        <div class="modal-background" onclick="document.getElementById('error-modal').classList.remove('is-active')"></div>
+        <div class="modal-card gd-modal">
+            <header class="modal-card-head">
+                <p class="modal-card-title">API Error</p>
+            </header>
+            <section class="modal-card-body">
+                <p id="error-content">Something went wrong. Try refreshing.</p>
+            </section>
+            <footer class="modal-card-foot">
+                <button class="button" onclick="document.getElementById('error-modal').classList.remove('is-active')">Close</button>
+            </footer>
+        </div>
+    </div>
+
+    <!-- Clipboard helper -->
+    <textarea id="copypaste" style="position:absolute;left:-9999px;top:-9999px;opacity:0"></textarea>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
