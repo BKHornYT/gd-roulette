@@ -1,7 +1,6 @@
 /* ── Constants ── */
 const GDB_SEARCH  = 'https://gdbrowser.com/api/search/';
-const PC_API_V2   = 'https://pointercrate.com/api/v2/demons/listed?limit=75';
-const PC_API_V1   = 'https://pointercrate.com/api/v1/demons/?limit=75';
+const PC_API      = 'https://pointercrate.com/api/v2/demons/listed/?limit=75';
 const API_DELAY   = 2500;
 const LS_HISTORY  = 'gdr-history-v1';
 const LS_ACTIVE   = 'gdr-active-v3';
@@ -234,17 +233,12 @@ async function startRoulette() {
     try {
         if (selectedDiffs.includes('demonlist')) {
             S.mode = 'pointercrate';
-            let demons = null;
+            let demons = [];
             try {
-                const res  = await fetch(PC_API_V2);
-                const data = await res.json();
-                demons = Array.isArray(data) ? data : null;
-            } catch {}
-            if (!demons) {
-                const res  = await fetch(PC_API_V1);
+                const res  = await fetch(PC_API);
                 const data = await res.json();
                 demons = Array.isArray(data) ? data : [];
-            }
+            } catch {}
             if (!demons.length) {
                 showError('Could not load the Extreme Demon List. Pointercrate may be down.');
                 startBtn.classList.remove('is-loading');
@@ -354,9 +348,9 @@ function getNextPC() {
     const lvl = S.pcPool.shift();
     if (!lvl) { getNextPC(); return; }
     S.currentDiffId = 'demonlist';
-    const author = lvl.publisher?.name || 'Unknown';
-    const note   = lvl.verifier?.name ? `Verified by ${lvl.verifier.name}` : '';
-    appendCard(lvl.name, author, note, 'demonlist', 'completePC');
+    const author  = lvl.publisher?.name || 'Unknown';
+    const idOrNote = lvl.level_id ? String(lvl.level_id) : (lvl.verifier?.name ? `Verified by ${lvl.verifier.name}` : '');
+    appendCard(lvl.name, author, idOrNote, 'demonlist', 'completePC');
 }
 
 /* ── Append active card ── */
