@@ -194,14 +194,15 @@ async function fetchPageFrom(diffData, page, iter = 0) {
     const key = 'p' + page;
     if (diffData.pages[key]) return diffData.pages[key];
     await fullDelay();
-    const res = await axios.get(diffData.query + '&page=' + page);
-    if (res.data === -1 || res.data === '-1') {
+    const res  = await fetch(diffData.query + '&page=' + page);
+    const data = await res.json();
+    if (data === -1 || data === '-1') {
         if (iter < 5) return fetchPageFrom(diffData, page, iter + 1);
         showError('GDBrowser rate-limited. Wait a moment and refresh.');
         throw new Error('rate-limited');
     }
-    diffData.pages[key] = res.data;
-    return res.data;
+    diffData.pages[key] = data;
+    return data;
 }
 
 /* ── Start roulette ── */
@@ -235,12 +236,14 @@ async function startRoulette() {
             S.mode = 'pointercrate';
             let demons = null;
             try {
-                const res = await axios.get(PC_API_V2);
-                demons = Array.isArray(res.data) ? res.data : null;
+                const res  = await fetch(PC_API_V2);
+                const data = await res.json();
+                demons = Array.isArray(data) ? data : null;
             } catch {}
             if (!demons) {
-                const res = await axios.get(PC_API_V1);
-                demons = Array.isArray(res.data) ? res.data : [];
+                const res  = await fetch(PC_API_V1);
+                const data = await res.json();
+                demons = Array.isArray(data) ? data : [];
             }
             if (!demons.length) {
                 showError('Could not load the Extreme Demon List. Pointercrate may be down.');
